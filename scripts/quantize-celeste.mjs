@@ -17,7 +17,7 @@ import { lab2rgb, rgb2lab } from "./lib/color.mjs";
 import { ensureDir, existsAsFile, walkPngFiles } from "./lib/fs-utils.mjs";
 import { buildPaletteLab, findNearestPaletteIndex } from "./lib/palette.mjs";
 import { computeStat } from "./lib/stats.mjs";
-import { emitBlueMarbleTemplate, ensureCelesteIndex } from "./lib/template-json.mjs";
+import { emitBlueMarbleTemplate, emitBlueMarbleSideTemplate, composeSideImage, emitBlueMarbleImage, ensureCelesteIndex } from "./lib/template-json.mjs";
 
 let SOURCE_ROOT = path.join(process.cwd(), "public", "img", "celeste");
 let OUTPUT_ROOT = path.join(process.cwd(), "wplace-templates", "quantized");
@@ -278,6 +278,7 @@ async function main() {
     const chapterProvided = hasArg("chapter");
     const sideProvided = hasArg("side");
     const emitTemplateFlag = parseFlagArg("emit-template");
+    const emitSideTemplateFlag = parseFlagArg("emit-side-template");
     let proceedWithoutTemplates = true;
     if (emitTemplateFlag && !chapterProvided) {
         console.warn("emit-template requires --chapter. You can still quantize images without emitting templates.");
@@ -291,6 +292,40 @@ async function main() {
     }
 
     const cache = new Map(); // rgb24 ^ cell -> [r,g,b] mapped
+
+    // Derive global start coordinates (for side-level stitching/templates)
+    const tileSize = 1000;
+    const startXGlobal = parseNumberArg("start-x", 0);
+    const startYGlobal = parseNumberArg("start-y", 0);
+    const startTileXGlobal = parseNumberArg("start-tile-x", NaN);
+    const startTileYGlobal = parseNumberArg("start-tile-y", NaN);
+    const startOffsetXGlobal = parseNumberArg("start-offset-x", NaN);
+    const startOffsetYGlobal = parseNumberArg("start-offset-y", NaN);
+    const startCoordsStrGlobal = parseStringArg("start-coords", "");
+    let startTileXParsedGlobal = Number.isNaN(startTileXGlobal) ? undefined : startTileXGlobal;
+    let startTileYParsedGlobal = Number.isNaN(startTileYGlobal) ? undefined : startTileYGlobal;
+    let startOffsetXParsedGlobal = Number.isNaN(startOffsetXGlobal) ? undefined : startOffsetXGlobal;
+    let startOffsetYParsedGlobal = Number.isNaN(startOffsetYGlobal) ? undefined : startOffsetYGlobal;
+    if (startCoordsStrGlobal) {
+        const parts = startCoordsStrGlobal
+            .split(/[\s,]+/)
+            .map((s) => Number(s.trim()))
+            .filter((n) => !Number.isNaN(n));
+        if (parts.length === 4 && parts.every((n) => Number.isFinite(n))) {
+            [startTileXParsedGlobal, startTileYParsedGlobal, startOffsetXParsedGlobal, startOffsetYParsedGlobal] = parts;
+        }
+    }
+    let baseAbsStartX = startXGlobal;
+    let baseAbsStartY = startYGlobal;
+    if (
+        Number.isFinite(startTileXParsedGlobal) &&
+        Number.isFinite(startTileYParsedGlobal) &&
+        Number.isFinite(startOffsetXParsedGlobal) &&
+        Number.isFinite(startOffsetYParsedGlobal)
+    ) {
+        baseAbsStartX = startTileXParsedGlobal * tileSize + startOffsetXParsedGlobal;
+        baseAbsStartY = startTileYParsedGlobal * tileSize + startOffsetYParsedGlobal;
+    }
     let processed = 0;
     if (st.isFile()) {
         // Determine if output is a file path or directory
@@ -323,17 +358,48 @@ async function main() {
                         }
                         const rooms = side.rooms || {};
                         // Room keys are assumed ordered as desired
+                        const sideEntries = [];
                         for (const roomId of Object.keys(rooms)) {
                             const candidate = path.join(SOURCE_ROOT, "rooms", chapter.id, side.id, `${roomId}.png`);
                             try {
                                 await fsp.access(candidate);
-                                const { rel } = await quantizeImageFile(candidate, paletteLab, cache, undefined, emitTemplateFlag && chapterProvided);
+                                const { rel, width, height } = await quantizeImageFile(candidate, paletteLab, cache, undefined, emitTemplateFlag && chapterProvided);
                                 processed++;
+                                if (emitSideTemplateFlag && chapterProvided) {
+                                    // Compute absolute coords for side aggregation
+                                    const index = await ensureCelesteIndex();
+                                    const roomKey = `${chapter.id}/${side.id}/${roomId}`;
+                                    const room = index && index.roomByPath.get(roomKey);
+                                    if (room && room.canvas && room.canvas.position) {
+                                        const absX = (room.canvas.position.x || 0) + baseAbsStartX;
+                                        const absY = (room.canvas.position.y || 0) + baseAbsStartY;
+                                        const outPngPath = path.join(OUTPUT_ROOT, "rooms", chapter.id, side.id, `${roomId}.png`);
+                                        sideEntries.push({ outputImagePath: outPngPath, absX, absY, width, height });
+                                    }
+                                }
                                 if (processed % 25 === 0) {
                                     console.log(`Processed ${processed}: ${rel}`);
                                 }
                             } catch {
                                 // Skip if file missing
+                            }
+                        }
+                        if (emitSideTemplateFlag && sideEntries.length > 0) {
+                            // 1) Compose a stitched side image
+                            const stitchedPng = path.join(OUTPUT_ROOT, "rooms", chapter.id, side.id, `__${chapter.id}-${side.id}.png`);
+                            const composed = await composeSideImage({ entries: sideEntries, outImagePath: stitchedPng });
+                            if (composed) {
+                                // 2) Emit a single BlueMarble template from the composed image
+                                const outFile = path.join(OUTPUT_ROOT, "rooms", chapter.id, side.id, `__${chapter.id}-${side.id}.json`);
+                                await emitBlueMarbleImage({
+                                    imagePath: stitchedPng,
+                                    absX: composed.minX,
+                                    absY: composed.minY,
+                                    width: composed.totalW,
+                                    height: composed.totalH,
+                                    outFilePath: outFile,
+                                    name: `celeste/${chapter.id}/${side.id}`,
+                                });
                             }
                         }
                     }
