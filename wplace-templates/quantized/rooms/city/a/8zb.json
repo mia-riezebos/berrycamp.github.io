@@ -2,15 +2,15 @@
   "whoami": "BlueMarble",
   "scriptVersion": "0.90.6",
   "schemaVersion": "1.0.0",
-  "createdAt": "2025-10-14T02:53:43.870Z",
-  "lastModified": "2025-10-14T02:53:43.870Z",
+  "createdAt": "2025-10-14T03:31:52.135Z",
+  "lastModified": "2025-10-14T03:31:52.135Z",
   "templateCount": 1,
   "totalPixels": 69120,
   "templates": {
     "328, 1782, 729, 292": {
       "name": "celeste/city/a/8zb",
       "coords": "328, 1782, 729, 292",
-      "createdAt": "2025-10-14T02:53:43.870Z",
+      "createdAt": "2025-10-14T03:31:52.135Z",
       "pixelCount": 69120,
       "validPixelCount": 69120,
       "transparentPixelCount": 0,
