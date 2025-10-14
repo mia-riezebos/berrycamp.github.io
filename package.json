@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "tsc": "tsc -noEmit",
-    "quantize:celeste": "node scripts/quantize-celeste.mjs",
+    "quantize:celeste": "node scripts/quantize-celeste.mjs --auto-dither-window -0.25 --dither-shift 1 --dither-basis lightness --auto-sat-window 10 --sat-boost 1 --sat-gamma 1 --sat-basis smart --sample-stat pctl --sample-pctl 50",
     "quantize:city": "node scripts/quantize-celeste.mjs --input public/img/celeste/rooms/city/a --output wplace-templates/quantized/rooms/city/a",
     "quantize:summit": "node scripts/quantize-celeste.mjs --input public/img/celeste/rooms/summit/a --output wplace-templates/quantized/rooms/summit/a",
     "palette:add-lab": "node scripts/update-palette-lab.mjs"
