@@ -309,37 +309,49 @@ async function main() {
         console.log(`Processed ${processed}: ${rel}`);
     } else {
         await ensureDir(OUTPUT_ROOT);
-        const cel = await ensureCelesteIndex();
-        if (cel && cel.data && Array.isArray(cel.data.chapters)) {
-            // Iterate celeste.json order: chapters → sides → rooms
-            for (const chapter of cel.data.chapters) {
-                if (chapterFilter && chapter.id !== chapterFilter) continue;
-                for (const side of chapter.sides || []) {
-                    if (chapterProvided) {
-                        const requiredSide = sideProvided ? sideFilter : "a";
-                        if (requiredSide && side.id !== requiredSide) continue;
-                    }
-                    const rooms = side.rooms || {};
-                    // Room keys are assumed ordered as desired
-                    for (const roomId of Object.keys(rooms)) {
-                        const candidate = path.join(SOURCE_ROOT, "rooms", chapter.id, side.id, `${roomId}.png`);
-                        try {
-                            await fsp.access(candidate);
-                            const { rel } = await quantizeImageFile(candidate, paletteLab, cache, undefined, emitTemplateFlag && chapterProvided);
-                            processed++;
-                            if (processed % 25 === 0) {
-                                console.log(`Processed ${processed}: ${rel}`);
-                            }
-                        } catch {
-                            // Skip if file missing
+        const useCelesteOrder = emitTemplateFlag; // only apply ordered processing when emitting templates is requested
+        if (useCelesteOrder) {
+            const cel = await ensureCelesteIndex();
+            if (cel && cel.data && Array.isArray(cel.data.chapters)) {
+                // Iterate celeste.json order: chapters → sides → rooms
+                for (const chapter of cel.data.chapters) {
+                    if (chapterFilter && chapter.id !== chapterFilter) continue;
+                    for (const side of chapter.sides || []) {
+                        if (chapterProvided) {
+                            const requiredSide = sideProvided ? sideFilter : "a";
+                            if (requiredSide && side.id !== requiredSide) continue;
                         }
+                        const rooms = side.rooms || {};
+                        // Room keys are assumed ordered as desired
+                        for (const roomId of Object.keys(rooms)) {
+                            const candidate = path.join(SOURCE_ROOT, "rooms", chapter.id, side.id, `${roomId}.png`);
+                            try {
+                                await fsp.access(candidate);
+                                const { rel } = await quantizeImageFile(candidate, paletteLab, cache, undefined, emitTemplateFlag && chapterProvided);
+                                processed++;
+                                if (processed % 25 === 0) {
+                                    console.log(`Processed ${processed}: ${rel}`);
+                                }
+                            } catch {
+                                // Skip if file missing
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Fallback to file order if index missing
+                for await (const file of walkPngFiles(SOURCE_ROOT)) {
+                    const { rel } = await quantizeImageFile(file, paletteLab, cache, undefined, emitTemplateFlag && chapterProvided);
+                    processed++;
+                    if (processed % 25 === 0) {
+                        console.log(`Processed ${processed}: ${rel}`);
                     }
                 }
             }
         } else {
-            // Fallback to file order if index missing
+            // No template emission: process by file order
             for await (const file of walkPngFiles(SOURCE_ROOT)) {
-                const { rel } = await quantizeImageFile(file, paletteLab, cache, undefined, emitTemplateFlag && chapterProvided);
+                const { rel } = await quantizeImageFile(file, paletteLab, cache, undefined, false);
                 processed++;
                 if (processed % 25 === 0) {
                     console.log(`Processed ${processed}: ${rel}`);
