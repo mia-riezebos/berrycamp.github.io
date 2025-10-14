@@ -2,15 +2,15 @@
   "whoami": "BlueMarble",
   "scriptVersion": "0.90.6",
   "schemaVersion": "1.0.0",
-  "createdAt": "2025-10-14T02:51:35.054Z",
-  "lastModified": "2025-10-14T02:51:35.054Z",
+  "createdAt": "2025-10-14T03:38:59.333Z",
+  "lastModified": "2025-10-14T03:38:59.333Z",
   "templateCount": 1,
   "totalPixels": 58880,
   "templates": {
     "323, 1784, 809, 332": {
       "name": "celeste/prologue/a/-1",
       "coords": "323, 1784, 809, 332",
-      "createdAt": "2025-10-14T02:51:35.054Z",
+      "createdAt": "2025-10-14T03:38:59.333Z",
       "pixelCount": 58880,
       "validPixelCount": 58880,
       "transparentPixelCount": 0,
