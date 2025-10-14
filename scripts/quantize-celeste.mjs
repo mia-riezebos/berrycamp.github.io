@@ -9,18 +9,30 @@
 import fsp from "fs/promises";
 import path from "path";
 import { PNG } from "pngjs";
+import readline from "readline";
+import { hasArg, parseFlagArg, parseNumberArg, parsePathArg, parseStringArg } from "./lib/args.mjs";
+import { applyRampedSaturationLab, applySelectiveDitherLab } from "./lib/color-ops.mjs";
 import { colorpalette as wplacePalette } from "./lib/color-palette.mjs";
 import { lab2rgb, rgb2lab } from "./lib/color.mjs";
-import { parseNumberArg, parsePathArg, parseStringArg, parseFlagArg, hasArg } from "./lib/args.mjs";
-import { computeStat } from "./lib/stats.mjs";
 import { ensureDir, existsAsFile, walkPngFiles } from "./lib/fs-utils.mjs";
-import { applyRampedSaturationLab, applySelectiveDitherLab } from "./lib/color-ops.mjs";
 import { buildPaletteLab, findNearestPaletteIndex } from "./lib/palette.mjs";
+import { computeStat } from "./lib/stats.mjs";
+import { emitBlueMarbleTemplate, ensureCelesteIndex } from "./lib/template-json.mjs";
 
 let SOURCE_ROOT = path.join(process.cwd(), "public", "img", "celeste");
 let OUTPUT_ROOT = path.join(process.cwd(), "wplace-templates", "quantized");
 
-async function quantizeImageFile(filePath, paletteLab, cache, outPathOverride) {
+function promptYesNo(question) {
+    return new Promise((resolve) => {
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        rl.question(question, (answer) => {
+            rl.close();
+            resolve(answer);
+        });
+    });
+}
+
+async function quantizeImageFile(filePath, paletteLab, cache, outPathOverride, emitTemplateEnabled) {
     const rel = path.relative(SOURCE_ROOT, filePath);
     const outPath = outPathOverride ? outPathOverride : path.join(OUTPUT_ROOT, rel);
     await ensureDir(path.dirname(outPath));
@@ -49,6 +61,25 @@ async function quantizeImageFile(filePath, paletteLab, cache, outPathOverride) {
     const debugSat = parseFlagArg("debug-sat");
     const debugDither = parseFlagArg("debug-dither");
     const debugPreview = parseFlagArg("debug-preview");
+    const startX = parseNumberArg("start-x", 0);
+    const startY = parseNumberArg("start-y", 0);
+    const startTileX = parseNumberArg("start-tile-x", NaN);
+    const startTileY = parseNumberArg("start-tile-y", NaN);
+    const startOffsetX = parseNumberArg("start-offset-x", NaN);
+    const startOffsetY = parseNumberArg("start-offset-y", NaN);
+    const startCoordsStr = parseStringArg("start-coords", "");
+    const chapterFilter = parseStringArg("chapter", "");
+    const sideFilter = parseStringArg("side", "");
+    let startTileXParsed = Number.isNaN(startTileX) ? undefined : startTileX;
+    let startTileYParsed = Number.isNaN(startTileY) ? undefined : startTileY;
+    let startOffsetXParsed = Number.isNaN(startOffsetX) ? undefined : startOffsetX;
+    let startOffsetYParsed = Number.isNaN(startOffsetY) ? undefined : startOffsetY;
+    if (startCoordsStr) {
+        const parts = startCoordsStr.split(/[\s,]+/).map((s) => Number(s.trim())).filter((n) => !Number.isNaN(n));
+        if (parts.length === 4 && parts.every((n) => Number.isFinite(n))) {
+            [startTileXParsed, startTileYParsed, startOffsetXParsed, startOffsetYParsed] = parts;
+        }
+    }
 
     // Subsample to compute average L* for dynamic ranges
     if (autoDitherProvided || autoSatProvided) {
@@ -210,6 +241,21 @@ async function quantizeImageFile(filePath, paletteLab, cache, outPathOverride) {
 
     const outputBuffer = PNG.sync.write({ width, height, data });
     await fsp.writeFile(outPath, outputBuffer);
+    // Optionally emit BlueMarble template JSON alongside the PNG
+    if (emitTemplateEnabled) {
+        await emitBlueMarbleTemplate({
+            inputImagePath: filePath,
+            outputImagePath: outPath,
+            width,
+            height,
+            startX,
+            startY,
+            startTileX: startTileXParsed,
+            startTileY: startTileYParsed,
+            startOffsetX: startOffsetXParsed,
+            startOffsetY: startOffsetYParsed,
+        });
+    }
     return { rel: outPathOverride ? path.relative(process.cwd(), outPath) : rel, width, height };
 }
 
@@ -227,6 +273,22 @@ async function main() {
     OUTPUT_ROOT = outputPath;
 
     const paletteLab = buildPaletteLab(wplacePalette);
+    const chapterFilter = parseStringArg("chapter", "");
+    const sideFilter = parseStringArg("side", "");
+    const chapterProvided = hasArg("chapter");
+    const sideProvided = hasArg("side");
+    const emitTemplateFlag = parseFlagArg("emit-template");
+    let proceedWithoutTemplates = true;
+    if (emitTemplateFlag && !chapterProvided) {
+        console.warn("emit-template requires --chapter. You can still quantize images without emitting templates.");
+        const ans = await promptYesNo("Proceed to quantize all images without emitting templates? [Y/N] ");
+        const ok = String(ans || "").trim().toLowerCase();
+        if (!(ok === "y" || ok === "yes")) {
+            console.log("Aborted by user.");
+            return;
+        }
+        proceedWithoutTemplates = true;
+    }
 
     const cache = new Map(); // rgb24 ^ cell -> [r,g,b] mapped
     let processed = 0;
@@ -241,18 +303,47 @@ async function main() {
             finalOutPath = path.join(outputPath, path.basename(inputPath));
         }
         await ensureDir(path.dirname(finalOutPath));
-        const { rel } = await quantizeImageFile(inputPath, paletteLab, cache, finalOutPath);
+        const { rel } = await quantizeImageFile(inputPath, paletteLab, cache, finalOutPath, emitTemplateFlag && chapterProvided);
         processed++;
         // eslint-disable-next-line no-console
         console.log(`Processed ${processed}: ${rel}`);
     } else {
         await ensureDir(OUTPUT_ROOT);
-        for await (const file of walkPngFiles(SOURCE_ROOT)) {
-            const { rel } = await quantizeImageFile(file, paletteLab, cache);
-            processed++;
-            if (processed % 25 === 0) {
-                // eslint-disable-next-line no-console
-                console.log(`Processed ${processed}: ${rel}`);
+        const cel = await ensureCelesteIndex();
+        if (cel && cel.data && Array.isArray(cel.data.chapters)) {
+            // Iterate celeste.json order: chapters → sides → rooms
+            for (const chapter of cel.data.chapters) {
+                if (chapterFilter && chapter.id !== chapterFilter) continue;
+                for (const side of chapter.sides || []) {
+                    if (chapterProvided) {
+                        const requiredSide = sideProvided ? sideFilter : "a";
+                        if (requiredSide && side.id !== requiredSide) continue;
+                    }
+                    const rooms = side.rooms || {};
+                    // Room keys are assumed ordered as desired
+                    for (const roomId of Object.keys(rooms)) {
+                        const candidate = path.join(SOURCE_ROOT, "rooms", chapter.id, side.id, `${roomId}.png`);
+                        try {
+                            await fsp.access(candidate);
+                            const { rel } = await quantizeImageFile(candidate, paletteLab, cache, undefined, emitTemplateFlag && chapterProvided);
+                            processed++;
+                            if (processed % 25 === 0) {
+                                console.log(`Processed ${processed}: ${rel}`);
+                            }
+                        } catch {
+                            // Skip if file missing
+                        }
+                    }
+                }
+            }
+        } else {
+            // Fallback to file order if index missing
+            for await (const file of walkPngFiles(SOURCE_ROOT)) {
+                const { rel } = await quantizeImageFile(file, paletteLab, cache, undefined, emitTemplateFlag && chapterProvided);
+                processed++;
+                if (processed % 25 === 0) {
+                    console.log(`Processed ${processed}: ${rel}`);
+                }
             }
         }
     }
