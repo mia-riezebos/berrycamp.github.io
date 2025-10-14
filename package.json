@@ -9,8 +9,8 @@
     "lint": "next lint",
     "tsc": "tsc -noEmit",
     "quantize:celeste": "node scripts/quantize-celeste.mjs --auto-dither-window -0.25 --dither-shift 1 --dither-basis lightness --auto-sat-window 10 --sat-boost 1 --sat-gamma 1 --sat-basis smart --sample-stat pctl --sample-pctl 50",
-    "quantize:city": "node scripts/quantize-celeste.mjs --input public/img/celeste/rooms/city/a --output wplace-templates/quantized/rooms/city/a",
-    "quantize:summit": "node scripts/quantize-celeste.mjs --input public/img/celeste/rooms/summit/a --output wplace-templates/quantized/rooms/summit/a",
+    "quantize:prologue": "node scripts/quantize-celeste.mjs --auto-dither-window -0.25 --dither-shift 1 --dither-basis lightness --auto-sat-window 10 --sat-boost 1 --sat-gamma 1 --sat-basis smart --sample-stat pctl --sample-pctl 50 --emit-template --emit-side-template --chapter prologue --start-coords 324,1784,177,332",
+    "quantize:city": "node scripts/quantize-celeste.mjs --auto-dither-window -0.25 --dither-shift 1 --dither-basis lightness --auto-sat-window 10 --sat-boost 1 --sat-gamma 1 --sat-basis smart --sample-stat pctl --sample-pctl 50 --emit-template --emit-side-template --chapter city --start-coords 326,1784,353,180",
     "palette:add-lab": "node scripts/update-palette-lab.mjs"
   },
   "dependencies": {
