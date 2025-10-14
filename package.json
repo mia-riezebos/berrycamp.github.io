@@ -7,7 +7,11 @@
     "build": "next build && next export",
     "start": "next start",
     "lint": "next lint",
-    "tsc": "tsc -noEmit"
+    "tsc": "tsc -noEmit",
+    "quantize:celeste": "node scripts/quantize-celeste.mjs",
+    "quantize:city": "node scripts/quantize-celeste.mjs --input public/img/celeste/rooms/city/a --output wplace-templates/quantized/rooms/city/a",
+    "quantize:summit": "node scripts/quantize-celeste.mjs --input public/img/celeste/rooms/summit/a --output wplace-templates/quantized/rooms/summit/a",
+    "palette:add-lab": "node scripts/update-palette-lab.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.10.5",
@@ -17,7 +21,8 @@
     "extent-canvas": "^0.0.7",
     "next": "12.3.4",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "pngjs": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "^18.11.18",
