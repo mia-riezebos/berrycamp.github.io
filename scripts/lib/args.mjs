@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 export function parseNumberArg(name, def) {
   const argv = process.argv;
   for (let i = 2; i < argv.length; i++) {
@@ -20,11 +22,11 @@ export function parsePathArg(name, defAbs) {
     const arg = argv[i];
     if (arg === `--${name}` && i + 1 < argv.length) {
       const v = argv[i + 1];
-      if (v) return require('path').resolve(process.cwd(), v);
+      if (v) return path.resolve(process.cwd(), v);
     }
     if (arg.startsWith(`--${name}=`)) {
       const v = arg.split('=')[1];
-      if (v) return require('path').resolve(process.cwd(), v);
+      if (v) return path.resolve(process.cwd(), v);
     }
   }
   return defAbs;
