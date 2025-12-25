@@ -13,6 +13,7 @@
     "quantize:celeste": "node scripts/quantize-celeste.mjs --auto-dither-window -0.25 --dither-shift 1 --dither-basis lightness --auto-sat-window 10 --sat-boost 1 --sat-gamma 1 --sat-basis smart --sample-stat pctl --sample-pctl 50",
     "quantize:prologue": "node scripts/quantize-celeste.mjs --auto-dither-window -0.25 --dither-shift 1 --dither-basis lightness --auto-sat-window 10 --sat-boost 1 --sat-gamma 1 --sat-basis smart --sample-stat pctl --sample-pctl 50 --emit-template --emit-side-template --chapter prologue --start-coords 324,1784,177,332",
     "quantize:city": "node scripts/quantize-celeste.mjs --auto-dither-window -0.25 --dither-shift 1 --dither-basis lightness --auto-sat-window 10 --sat-boost 1 --sat-gamma 1 --sat-basis smart --sample-stat pctl --sample-pctl 50 --emit-template --emit-side-template --chapter city --start-coords 326,1784,353,180",
+    "quantize:site": "node scripts/quantize-celeste.mjs --auto-dither-window -0.25 --dither-shift 1 --dither-basis lightness --auto-sat-window 10 --sat-boost 1 --sat-gamma 1 --sat-basis smart --sample-stat pctl --sample-pctl 50 --emit-template --emit-side-template --chapter site --start-coords 330,1780,553,964",
     "palette:add-lab": "node scripts/update-palette-lab.mjs"
   },
   "dependencies": {
